@@ -220,42 +220,6 @@ The attack map was built as an **Azure Workbook** using a `Map` visualisation wi
 
 ---
 
-## 🖼️ Architectural Diagram Prompt
-
-Use the following prompt in any AI diagramming tool (e.g., Eraser.io, Lucidchart AI, Claude, or ChatGPT) to regenerate the architecture diagram:
-
-```
-Create a professional cloud architecture diagram for an Azure SOC (Security Operations Centre)
-honeypot lab with the following components and flow:
-
-LEFT SIDE — Public Internet (threat actor zone):
-- Label "PUBLIC INTERNET" in bold red
-- Show 5 hacker/attacker icons arranged in a cloud shape
-- Label them "(actual attackers)"
-- Add a skull icon to represent danger
-
-CENTER — Azure Subscription box containing:
-  Resource Group box containing:
-    - VNet icon labelled "VNet"
-    - A Windows VM icon labelled "VM" (Windows 11)
-    - An NSG (shield) icon with a red X, labelled "NSG"
-      representing the deliberately open firewall (Priority 100, allow all)
-    - A Log Analytics icon labelled "Log Analytics Workspace"
-  - Red dashed arrows from attackers → NSG → VM (attack flow)
-  - A black arrow from VM → Log Analytics (log forwarding via AzureMonitorWindowsAgent)
-
-RIGHT SIDE — Microsoft Sentinel box:
-  - Sentinel shield logo labelled "Microsoft Sentinel (SIEM)"
-  - A map thumbnail showing the attack map visualisation (heatmap)
-  - Arrows: Log Analytics → Sentinel → Attack Map
-
-Style: Clean, professional, blue and white Azure-style colour scheme.
-Use Azure architecture icons where possible.
-Include a legend explaining the arrow types (attack flow vs. log flow).
-```
-
----
-
 ## 📚 Lessons Learned
 
 - Exposed RDP/SMB services on public IPs are discovered and attacked **within minutes**, not hours — internet-facing honeypots receive real traffic almost immediately
