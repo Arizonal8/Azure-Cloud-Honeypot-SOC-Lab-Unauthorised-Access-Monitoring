@@ -1,10 +1,10 @@
-# 🛡️ Azure Cloud Honeypot & SOC Lab — Unauthorised Access Monitoring
+# Azure Cloud Honeypot & SOC Lab — Unauthorised Access Monitoring
 
 > A hands-on Security Operations Centre (SOC) simulation built on Microsoft Azure. A deliberately exposed Windows VM honeypot was deployed to attract real-world brute-force attacks, with all activity captured and analysed through Microsoft Sentinel (SIEM), Log Analytics, and a geo-mapped attack dashboard.
 
 ---
 
-## 📐 Architecture
+## Architecture
 
 ![Azure Honeypot Architecture Diagram](https://github.com/Arizonal8/Azure-Cloud-Honeypot-SOC-Lab-Unauthorised-Access-Monitoring/raw/main/diagram-export-4-6-2026-3_41_44-PM.png)
 
@@ -12,7 +12,7 @@ The diagram above illustrates the full data flow: attackers from the public inte
 
 ---
 
-## 🗂️ Table of Contents
+## Table of Contents
 
 - [Project Overview](#project-overview)
 - [Tools & Services Used](#tools--services-used)
@@ -26,7 +26,7 @@ The diagram above illustrates the full data flow: attackers from the public inte
 
 ---
 
-## 📌 Project Overview
+##  Project Overview
 
 This project simulates a real-world SOC analyst workflow by:
 
@@ -42,7 +42,7 @@ The honeypot was live on **6 April 2026** and attracted real brute-force attacks
 
 ---
 
-## 🧰 Tools & Services Used
+##  Tools & Services Used
 
 ### Cloud Platform
 
@@ -79,7 +79,7 @@ The honeypot was live on **6 April 2026** and attracted real brute-force attacks
 
 ---
 
-## 🏗️ Infrastructure Setup
+## Infrastructure Setup
 
 ### Resource Group: `RG-SOC-LAB-APRIL` (UK South)
 
@@ -109,7 +109,7 @@ The honeypot was live on **6 April 2026** and attracted real brute-force attacks
 
 ---
 
-## 🔑 Key Findings
+## Key Findings
 
 ### Brute-Force Attack Volume
 
@@ -214,13 +214,13 @@ This query:
 
 ---
 
-## 🌍 Attack Map
+##  Attack Map
 
 The attack map was built as an **Azure Workbook** using a `Map` visualisation with heatmap colouring (green → red by `FailureCount`). The large red bubble over Poland represents the dominant attack cluster (~47,700 failed login attempts from Jordanow).
 
 ---
 
-## 📚 Lessons Learned
+##  Lessons Learned
 
 - Exposed RDP/SMB services on public IPs are discovered and attacked **within minutes**, not hours — internet-facing honeypots receive real traffic almost immediately
 - Attackers use fully automated credential-stuffing with standard username dictionaries (`administrator`, `admin`, `user`, `test`) — default credentials remain the most targeted attack vector
