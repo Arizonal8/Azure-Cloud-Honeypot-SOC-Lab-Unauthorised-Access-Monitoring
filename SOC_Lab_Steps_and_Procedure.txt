@@ -1,0 +1,352 @@
+=========================================================
+  AZURE SOC HONEYPOT LAB — FULL STEP-BY-STEP PROCEDURE
+  Date: 6 April 2026 | Author: Arinze Ihekweme
+=========================================================
+
+OVERVIEW
+--------
+This document records every step taken to build a cloud-based
+Security Operations Centre (SOC) honeypot lab on Microsoft Azure,
+attract real-world brute-force attacks, and visualise them using
+Microsoft Sentinel (SIEM) and a geo-mapped Azure Workbook.
+
+
+=========================================================
+PHASE 1 — AZURE ENVIRONMENT SETUP
+=========================================================
+
+STEP 1: Create a Resource Group
+--------------------------------
+1. Log in to portal.azure.com
+2. Search for "Resource groups" -> click Create
+3. Set:
+   - Subscription: Azure subscription 1
+   - Resource group name: RG-SOC-LAB-APRIL
+   - Region: UK South
+4. Click Review + Create -> Create
+5. Confirm 1 resource group exists with 0 resources
+
+STEP 2: Create a Virtual Network
+----------------------------------
+1. In the Azure portal, search "Virtual networks" -> Create
+2. Set:
+   - Resource group: RG-SOC-LAB-APRIL
+   - Name: VN_SOC_Lab
+   - Region: UK South
+3. Under IP Addresses, keep default address space (e.g., 10.0.0.0/16)
+4. Add a subnet named "default"
+5. Click Review + Create -> Create
+
+STEP 3: Create the Windows Virtual Machine (Honeypot)
+------------------------------------------------------
+1. Search "Virtual machines" -> Create -> Azure virtual machine
+2. Set:
+   - Resource group: RG-SOC-LAB-APRIL
+   - Virtual machine name: SOC-LabTest-RG
+   - Region: UK South
+   - Image: Windows 11 (latest)
+   - Size: Choose an affordable SKU (e.g., Standard_B2s)
+   - Username: [your chosen admin username]
+   - Password: [strong password - record securely]
+   - Inbound ports: Allow RDP (3389)
+3. Under Networking:
+   - Virtual network: VN_SOC_Lab
+   - Subnet: default
+   - Public IP: Create new -> name SOC-LabTest-RG-ip
+   - NIC network security group: Basic
+4. Click Review + Create -> Create
+5. Wait for deployment to succeed (note the public IP, e.g., 20.108.28.87)
+
+
+=========================================================
+PHASE 2 — DELIBERATELY MISCONFIGURE SECURITY (HONEYPOT)
+=========================================================
+
+STEP 4: Open the NSG to All Inbound Traffic
+--------------------------------------------
+1. Navigate to: RG-SOC-LAB-APRIL -> SOC-LabTest-RG-nsg -> Inbound security rules
+2. Click "+ Add" to create a new inbound rule:
+   - Source: Any
+   - Source port ranges: *
+   - Destination: Any
+   - Destination port ranges: *
+   - Protocol: Any
+   - Action: Allow
+   - Priority: 100  <- Must be lower number (higher priority) than deny at 65500
+   - Name: Danger_All_access
+3. Click Add
+4. Verify the rule appears at the top of the list with a warning triangle
+
+NOTE: This allows ALL traffic from the internet. NEVER do this in production.
+
+STEP 5: Connect to the VM and Disable Windows Firewall
+------------------------------------------------------
+1. On the Linux workstation, open Remmina (Remote Desktop Client)
+2. Create a new RDP connection:
+   - Server: 20.108.28.87 (the VM's public IP)
+   - Username: [VM admin username]
+   - Password: [VM admin password]
+3. Connect to the VM
+4. Open "Windows Defender Firewall with Advanced Security" (run: wf.msc)
+5. Click "Windows Defender Firewall Properties"
+6. On each tab (Domain Profile, Private Profile, Public Profile):
+   - Set Firewall state: Off
+7. Click OK / Apply
+8. Verify all three profiles show "Windows Defender Firewall is off"
+
+NOTE: This disables the host-based firewall, maximising honeypot exposure.
+
+STEP 6: Verify Public Accessibility
+-------------------------------------
+1. On the Linux workstation, open a terminal
+2. Run: ping 20.108.28.87
+3. Confirm ICMP responses (e.g., 64 bytes from 20.108.28.87, ttl=116, time=14ms)
+4. This confirms the VM is publicly reachable from the internet
+
+
+=========================================================
+PHASE 3 — LOG COLLECTION SETUP
+=========================================================
+
+STEP 7: Create a Log Analytics Workspace
+------------------------------------------
+1. Search "Log Analytics workspaces" -> Create
+2. Set:
+   - Resource group: RG-SOC-LAB-APRIL
+   - Name: LogAnalyticsWorkspaceSOC
+   - Region: UK South
+3. Click Review + Create -> Create
+
+STEP 8: Enable Microsoft Sentinel on the Workspace
+----------------------------------------------------
+1. Search "Microsoft Sentinel" -> Create
+2. Select workspace: LogAnalyticsWorkspaceSOC
+3. Click Add Microsoft Sentinel
+4. Wait for the Sentinel solution to deploy
+
+STEP 9: Install the Azure Monitor Windows Agent on the VM
+----------------------------------------------------------
+1. Navigate to VM: SOC-LabTest-RG
+2. Left menu -> Extensions + applications -> "+ Add"
+3. Search for and select: AzureMonitorWindowsAgent
+4. Click Next -> Review + Create -> Create
+5. Wait for Status: Provisioning succeeded
+6. Verify:
+   - Type: Microsoft.Azure.Monitor.AzureMonitorWindowsAgent
+   - Version: 1.41.0.0
+   - Handler status: Ready
+
+STEP 10: Create a Data Collection Rule (DCR)
+---------------------------------------------
+1. Search "Data Collection Rules" -> Create
+2. Set:
+   - Name: DCR_Win_SOC
+   - Resource group: RG-SOC-LAB-APRIL
+   - Region: UK South
+   - Platform type: Windows
+3. Under Resources tab: Add VM -> SOC-LabTest-RG
+4. Under Collect and deliver tab:
+   - Add data source: Windows Event Logs
+   - Select: Security (Audit Failure + Audit Success)
+   - Destination: LogAnalyticsWorkspaceSOC
+5. Click Review + Create -> Create
+
+NOTE: This creates the pipeline: VM Security Events -> AMA Agent -> Log Analytics
+
+
+=========================================================
+PHASE 4 — VERIFY LOG INGESTION
+=========================================================
+
+STEP 11: Confirm Events Are Flowing into Log Analytics
+-------------------------------------------------------
+1. Navigate to: LogAnalyticsWorkspaceSOC -> Logs
+2. In the query editor run: SecurityEvent
+3. Set time range: Last 24 hours -> Run Query
+4. Verify results showing:
+   - Computer: SOC-LabTest-RG
+   - EventSourceName: Microsoft-Windows-Security-Auditing
+   - Event IDs: 4624, 4625, 4672 present
+
+STEP 12: Inspect Events in Windows Event Viewer (on VM)
+-------------------------------------------------------
+1. On the VM (via Remmina), open Event Viewer
+2. Navigate to: Windows Logs -> Security
+3. Observe rapidly growing event count (797+ events within minutes)
+4. Filter for Event ID 4625 (Audit Failure)
+5. Inspect an event to see:
+   - Account Name: [targeted username]
+   - Source Network Address: [attacker IP]
+   - Failure Reason: Unknown user name or bad password
+   - Logon Type: 3 (Network)
+   - Authentication Package: NTLM
+
+
+=========================================================
+PHASE 5 — SIMULATE AN UNAUTHORISED LOGIN ATTEMPT
+=========================================================
+
+STEP 13: Perform a Controlled Test Attack
+------------------------------------------
+1. On the Linux workstation, open Remmina
+2. Attempt an RDP connection with INCORRECT credentials:
+   - Server: 20.108.28.87
+   - Username: Arizay (non-existent account)
+   - Password: [intentionally wrong]
+3. The connection will be refused
+4. On the VM in Event Viewer -> Security, locate the new Event ID 4625 with:
+   - Account Name: Arizay
+   - Source Network Address: 5.151.212.211 (Linux workstation IP)
+   - Workstation Name: arinze-Latitude-5420
+5. This confirms the full pipeline captures both real and simulated attacks
+
+
+=========================================================
+PHASE 6 — GEOIP WATCHLIST IN MICROSOFT SENTINEL
+=========================================================
+
+STEP 14: Prepare the GeoIP CSV File
+-------------------------------------
+1. Obtain geoip-summarized.csv with columns:
+   network, latitude, longitude, cityname, countryname
+2. Verify the file contains ~54,803 rows of CIDR-to-location mappings
+
+STEP 15: Create the Watchlist in Microsoft Sentinel
+----------------------------------------------------
+1. In Microsoft Sentinel -> Configuration -> Watchlists -> "+ New"
+2. General tab:
+   - Name: geoip
+   - Alias: geoip
+3. Source tab:
+   - Source type: Local file
+   - Upload: geoip-summarized.csv
+   - SearchKey column: network
+4. Click Review + Create -> Create
+5. Wait for Status: Succeeded (several minutes for 54K rows)
+6. Verify Watchlist Items: 55K
+
+STEP 16: Validate Watchlist via Advanced Hunting
+-------------------------------------------------
+1. Sentinel -> Threat Management -> Hunting -> Advanced Hunting
+2. Run: _GetWatchlist('geoip')
+3. Verify 54,803 items returned with correct columns
+
+
+=========================================================
+PHASE 7 — BUILD THE ATTACK MAP IN AZURE WORKBOOK
+=========================================================
+
+STEP 17: Create the Attack Map Workbook
+-----------------------------------------
+1. In Microsoft Sentinel -> Threat Management -> Workbooks -> "+ Add workbook"
+2. Click Edit -> Add query
+3. Enter the KQL query:
+
+   let GeoIPDB_FULL = _GetWatchlist("geoip");
+   let WindowsEvents = SecurityEvent;
+   WindowsEvents | where EventID == 4625
+   | order by TimeGenerated desc
+   | evaluate ipv4_lookup(GeoIPDB_FULL, IpAddress, network)
+   | summarize FailureCount = count() by IpAddress, latitude, longitude, cityname, countryname
+   | project FailureCount, AttackerIp = IpAddress, latitude, longitude,
+     city = cityname, country = countryname,
+     friendly_location = strcat(cityname, " (", countryname, ")");
+
+4. Set:
+   - Data source: Logs (Analytics)
+   - Resource: LogAnalyticsWorkspaceSOC
+   - Time range: Last 30 days
+   - Visualization: Map
+   - Size: Full
+
+5. Under Map Settings:
+   - Location info: Latitude/Longitude
+   - Latitude field: latitude
+   - Longitude field: longitude
+   - Size by: FailureCount (Sum)
+   - Label: friendly_location
+   - Color type: Heatmap (green -> red)
+
+6. Click Done Editing -> Save workbook as "Windows VM Attack Map"
+7. Map will show:
+   - Large red bubble over Poland (Jordanow) = ~47,700 failures
+   - Small dot over India (Mumbai) = 1 failure
+
+
+=========================================================
+PHASE 8 — ANALYSE THE DATA
+=========================================================
+
+STEP 18: Export and Review Query Data
+---------------------------------------
+1. In Log Analytics -> Logs, run:
+   SecurityEvent | where EventID == 4625 | order by TimeGenerated desc
+2. Export -> Download as CSV (query_data.csv)
+3. Key findings from 1,000-row sample:
+   - 969 rows are Event ID 4625 (96.9% attack traffic)
+   - Primary attacker IP: 185.156.73.74 (491 attempts)
+   - Secondary IP: 185.156.73.169 (478 attempts)
+   - Top targeted usernames: administrator, admin, user, test, administrador
+   - All attacks: Logon Type 3 (Network) via NTLM / NtLmSsp
+
+
+=========================================================
+PHASE 9 — CLEANUP (AFTER LAB COMPLETION)
+=========================================================
+
+STEP 19: Restore Security Configuration
+-----------------------------------------
+1. On the VM, re-enable Windows Defender Firewall on all profiles
+2. In Azure portal, delete the NSG rule "Danger_All_access" (Priority 100)
+3. Replace with a restricted rule allowing only your IP on port 3389
+
+STEP 20: Delete Resources to Avoid Charges
+--------------------------------------------
+1. Navigate to RG-SOC-LAB-APRIL
+2. Click "Delete resource group"
+3. Type the resource group name to confirm -> Delete
+4. Verify no remaining resources in the subscription
+
+WARNING: An exposed VM left running will continue to be attacked
+         and will incur ongoing Azure compute charges.
+
+
+=========================================================
+SUMMARY TABLE
+=========================================================
+
+Component                        Purpose
+---------------------------------+------------------------------------------
+Windows 11 VM (SOC-LabTest-RG)  | Honeypot - deliberate attack target
+NSG (Danger_All_access rule)     | Opens all ports to the internet
+AzureMonitorWindowsAgent         | Forwards Security events to Log Analytics
+Log Analytics Workspace          | Stores all security telemetry
+Data Collection Rule (DCR)       | Defines event collection pipeline
+Microsoft Sentinel               | SIEM - detection and visualisation
+Sentinel Watchlist (geoip)       | 54,803-row IP-to-location lookup
+Azure Workbook (Attack Map)      | Geo-visualisation of brute-force origins
+KQL Query                        | Joins failed logins with geolocation data
+Linux (Ubuntu) workstation       | Lab management + controlled attack sim
+Remmina RDP client               | Remote desktop access to Windows VM
+Windows Event Viewer             | Direct inspection of raw security logs
+
+
+=========================================================
+KEY STATISTICS
+=========================================================
+
+Lab duration:             ~2 hours (07:00-09:00 UTC, 6 April 2026)
+Total events captured:    1,000 (Log Analytics sample)
+Failed login events:      969 (96.9%)
+Unique attacker IPs:      2 (185.156.73.74 and 185.156.73.169)
+Top attack origin:        Jordanow, Poland (~47,700 total failures)
+Top targeted username:    administrator (58 attempts in sample)
+GeoIP watchlist entries:  54,803
+VM public IP:             20.108.28.87
+Azure region:             UK South
+Attacker auth protocol:   NTLM, Logon Type 3 (Network)
+
+
+=========================================================
+END OF PROCEDURE DOCUMENT
+=========================================================
