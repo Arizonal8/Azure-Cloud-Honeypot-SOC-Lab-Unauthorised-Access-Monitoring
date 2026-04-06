@@ -6,7 +6,7 @@
 
 ## 📐 Architecture
 
-([Azure Honeypot Architecture Diagram](https://github.com/Arizonal8/Azure-Cloud-Honeypot-SOC-Lab-Unauthorised-Access-Monitoring/raw/main/diagram-export-4-6-2026-3_41_44-PM.png))
+![Azure Honeypot Architecture Diagram](https://github.com/Arizonal8/Azure-Cloud-Honeypot-SOC-Lab-Unauthorised-Access-Monitoring/raw/main/diagram-export-4-6-2026-3_41_44-PM.png)
 
 The diagram above illustrates the full data flow: attackers from the public internet attempt to breach the exposed VM through a permissive NSG, the VM forwards security events to a Log Analytics Workspace, and Microsoft Sentinel enriches and visualises the data via a GeoIP watchlist and KQL-powered attack map.
 
